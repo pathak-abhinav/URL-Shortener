@@ -2,9 +2,19 @@ const { getUserUrlsService, deleteUserUrlService } = require("../services/user.s
 
 const getUserUrlsController = async (req, res) => {
    const userId = req.user.userId;
+   const {page, startIndex, limit} = req.pagination;
    try {
-    const result = await getUserUrlsService(userId);
-    res.status(200).json({ result });
+   console.log("Decoded user in GET /urls:", req.user);
+    const { urls, total} = await getUserUrlsService(userId, {startIndex, limit});
+    res.status(200).json({ 
+      result: urls,
+      pagination: {
+         page,
+         limit,
+         total,
+         totalPages: Math.ceil(total / limit),
+       },
+    });
    } catch (err) {
     console.error("Error fetching user URLs:", err);
     res.status(500).json({ error: "Failed to fetch URLs" });

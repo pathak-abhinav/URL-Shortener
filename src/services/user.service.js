@@ -1,8 +1,15 @@
 const { UrlStore } = require("../database/mongodb/url-model");
 
-const getUserUrlsService = async (userId) => {
-	const urls = await UrlStore.find({ userId }).sort({ createdAt: -1 });
-    return urls;
+const getUserUrlsService = async (userId, { startIndex, limit }) => {
+	const [urls, total] = await Promise.all([
+		UrlStore.find({ userId })
+			.sort({ createdAt: -1 })
+			.skip(startIndex)
+			.limit(limit)
+			.exec(),
+		UrlStore.countDocuments({ userId }),
+	]);
+	return { urls, total };
 };
 
 const deleteUserUrlService = async (id, userId)=>{
