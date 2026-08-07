@@ -1,0 +1,381 @@
+openapi: 3.0.3
+info:
+  title: URL Shortener API
+  version: 1.0.0
+  description: |
+    REST API for shortening URLs with optional user accounts.
+
+    **Authentication:** Login via `POST /v1/login` sets an HTTP-only `authToken` cookie.
+    Protected routes require that cookie. In Swagger UI, log in first — the browser
+    will send the cookie automatically on subsequent requests from the same origin.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Health
+    description: Service health
+  - name: Auth
+    description: Registration and login
+  - name: URLs
+    description: Shorten and redirect
+  - name: User
+    description: Authenticated user dashboard
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: authToken
+      description: JWT set by POST /v1/login (HTTP-only cookie)
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      example:
+        error: user not found
+
+    MessageResponse:
+      type: object
+      properties:
+        msg:
+          type: string
+
+    AuthCredentials:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          example: secret123
+
+    ShortenRequest:
+      type: object
+      required:
+        - longUrl
+      properties:
+        longUrl:
+          type: string
+          format: uri
+          example: https://example.com/very/long/path
+
+    ShortenResponse:
+      type: object
+      properties:
+        shortenedUrl:
+          type: string
+          example: http://localhost:8080/abc123xyz
+
+    UrlItem:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 507f1f77bcf86cd799439011
+        shortId:
+          type: string
+          example: abc123xyz
+        longUrl:
+          type: string
+          example: https://example.com
+        userId:
+          type: string
+          example: 507f1f77bcf86cd799439012
+        createdAt:
+          type: string
+          format: date-time
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 23
+        totalPages:
+          type: integer
+          example: 3
+
+    UserUrlsResponse:
+      type: object
+      properties:
+        result:
+          type: array
+          items:
+            $ref: "#/components/schemas/UrlItem"
+        pagination:
+          $ref: "#/components/schemas/PaginationMeta"
+
+paths:
+  /v1/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        "200":
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uptime:
+                    type: number
+                  responseTime:
+                    type: array
+                    items:
+                      type: integer
+                  timestamp:
+                    type: number
+
+  /v1/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthCredentials"
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  msg:
+                    type: string
+                    example: successfully registered
+        "400":
+          description: Validation error or user already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/login:
+    post:
+      tags: [Auth]
+      summary: Login and receive auth cookie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthCredentials"
+      responses:
+        "200":
+          description: Login successful; sets authToken cookie
+          headers:
+            Set-Cookie:
+              description: HTTP-only JWT cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Login successful
+                  userId:
+                    type: string
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/shorten:
+    post:
+      tags: [URLs]
+      summary: Create a short URL
+      description: |
+        Works for guests and logged-in users. If the `authToken` cookie is present,
+        the shortened URL is associated with that user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShortenRequest"
+      responses:
+        "201":
+          description: Short URL created or existing URL returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShortenResponse"
+        "400":
+          description: Invalid URL format
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  msg:
+                    type: string
+                    example: please enter a valid url
+        "403":
+          description: Domain is blacklisted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  msg:
+                    type: string
+                    example: This domain is not allowed.
+
+  /v1/user/urls:
+    get:
+      tags: [User]
+      summary: List user's shortened URLs (paginated)
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number (starts at 1)
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Items per page (max 50)
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Paginated list of URLs owned by the user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserUrlsResponse"
+        "401":
+          description: Missing or invalid auth cookie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Failed to fetch URLs
+
+  /v1/user/urls/{id}:
+    delete:
+      tags: [User]
+      summary: Delete a shortened URL
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: MongoDB document ID of the URL
+          schema:
+            type: string
+      responses:
+        "200":
+          description: URL deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  msg:
+                    type: string
+                    example: successfully deleted
+        "401":
+          description: Missing or invalid auth cookie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: URL not found or not owned by user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/user/logout:
+    post:
+      tags: [User]
+      summary: Logout and clear auth cookie
+      responses:
+        "200":
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully
+
+  /{shortId}:
+    get:
+      tags: [URLs]
+      summary: Redirect to original URL
+      description: Looks up the short ID in Redis (cache-aside) then MongoDB. Returns a 301 redirect.
+      parameters:
+        - name: shortId
+          in: path
+          required: true
+          description: nanoid short identifier
+          schema:
+            type: string
+            example: abc123xyz
+      responses:
+        "301":
+          description: Redirect to the original long URL
+          headers:
+            Location:
+              description: Original URL
+              schema:
+                type: string
+        "404":
+          description: Short ID not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  msg:
+                    type: string
+                    example: url not found

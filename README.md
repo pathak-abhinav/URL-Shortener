@@ -14,6 +14,13 @@ A full-stack URL shortener with optional user accounts and Redis-backed redirect
 | **Config** | YAML (`config.yaml`) |
 | **Frontend** | React 19, Vite, React Router, Tailwind CSS |
 | **HTTP client** | Axios |
+| **API docs** | Swagger UI (OpenAPI 3) |
+
+## API Documentation
+
+Interactive Swagger UI: [http://localhost:8080/api-docs](http://localhost:8080/api-docs)
+
+OpenAPI spec (JSON): [http://localhost:8080/openapi.json](http://localhost:8080/openapi.json)
 
 ## High-Level Design
 

@@ -4,6 +4,7 @@ const cookieParser = require("cookie-parser");
 const config = require("./config");
 const connectMongo = require("./database/mongodb");
 const router = require("./router");
+const setupSwagger = require("./docs/swagger");
 
 class Server {
 	constructor() {
@@ -36,12 +37,14 @@ class Server {
 	}
 
 	initRoutes() {
+		setupSwagger(this.app);
 		this.app.use("/", router); // Load all routes
 	}
 
 	start() {
 		this.app.listen(this.port, () => {
 			console.log(`Server is running on http://localhost:${this.port}`);
+			console.log(`API docs available at http://localhost:${this.port}/api-docs`);
 		});
 	}
 
