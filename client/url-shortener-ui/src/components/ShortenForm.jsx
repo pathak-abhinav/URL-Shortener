@@ -1,7 +1,7 @@
 import { useState } from "react";
 import axios from "../api/axios"
 
-const ShortenForm = () => {
+const ShortenForm = ({ onSuccess }) => {
   const [url, setUrl] = useState("");
   const [shortened, setShortened] = useState("");
 
@@ -10,6 +10,10 @@ const ShortenForm = () => {
     try {
       const res = await axios.post("/v1/shorten", { longUrl: url });
       setShortened(res.data.shortenedUrl);
+      // Call the callback if provided (for dashboard refresh)
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (err) {
       console.error("Error shortening URL", err);
       alert(err.response?.data?.error || "Something went wrong");
