@@ -3,16 +3,22 @@ import axios from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import ShortenForm from "../components/ShortenForm"; // Import the existing component
 
+const PAGE_SIZE = 10;
+
 export default function Dashboard() {
   const [urls, setUrls] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const navigate = useNavigate();
 
   const fetchUrls = async () => {
     try {
-      const res = await axios.get("/v1/user/urls");
-      console.log("Fetched URLs:", res.data);
+      const res = await axios.get("/v1/user/urls", { params: { page, limit: PAGE_SIZE } });
       setUrls(res.data?.result || []);
+      setTotal(res.data?.pagination?.total ?? 0);
+      setTotalPages(Math.max(1, res.data?.pagination?.totalPages ?? 1));
     } catch (err) {
       console.error("Dashboard fetch error", err);
     } finally {
@@ -22,7 +28,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchUrls();
-  }, []);
+  }, [page]);
 
   const handleLogout = async () => {
     try {
@@ -39,7 +45,9 @@ export default function Dashboard() {
 
   // Callback function to refresh URLs after successful shortening
   const onUrlShortened = () => {
-    fetchUrls();
+    // newest URLs are listed first, so jump back to page 1
+    if (page !== 1) setPage(1);
+    else fetchUrls();
   };
 
   const handleDelete = async (urlId) => {
@@ -49,8 +57,9 @@ export default function Dashboard() {
 
     try {
       await axios.delete(`/v1/urls/${urlId}`);
-      // Refresh the URLs list after successful deletion
-      fetchUrls();
+      // Step back a page if the last item on this page was deleted
+      if (urls.length === 1 && page > 1) setPage(page - 1);
+      else fetchUrls();
     } catch (err) {
       console.error("Delete error", err);
       alert("Error deleting URL. Please try again.");
@@ -91,7 +100,7 @@ export default function Dashboard() {
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Your URLs</h2>
               <p className="text-gray-600">
-                {loading ? "Loading..." : `${urls.length} URL${urls.length !== 1 ? 's' : ''} created`}
+                {loading ? "Loading..." : `${total} URL${total !== 1 ? 's' : ''} created`}
               </p>
             </div>
 
@@ -155,6 +164,28 @@ export default function Dashboard() {
                     </div>
                   ))
                 )}
+              </div>
+            )}
+
+            {!loading && totalPages > 1 && (
+              <div className="flex justify-between items-center mt-6">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-600">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
               </div>
             )}
           </div>
